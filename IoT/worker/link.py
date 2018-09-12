@@ -2,15 +2,15 @@
 # Author: falseuser
 # File Name: link.py
 # Created Time: 2018-08-29 16:38:37
-# Last modified: 2018-09-08 16:27:46
+# Last modified: 2018-09-12 11:21:13
 # Description:
 # =============================================================================
 import paho.mqtt.client as mqtt
 # from configure import CONFIG
-from slave_utils import link_logger, slave_logger, config
+from worker_utils import link_logger, worker_logger, config
 
 
-class SlaveLink(object):
+class WorkerLink(object):
 
     def __init__(self, client_id, parent_topic):
         self.client_id = client_id
@@ -46,7 +46,7 @@ class SlaveLink(object):
         )
         self.status_id = rc
         if self.status_id == 0:
-            slave_logger.info("Connection success.")
+            worker_logger.info("Connection success.")
 
     def on_message(self, client, userdata, msg):
         self.processing(msg.payload)
@@ -63,7 +63,7 @@ class SlaveLink(object):
         self.last_mid = cmd_info.mid
         if cmd_info.rc != 0:
             self.status_id = cmd_info.rc
-            slave_logger.warning("Link channel is broken")
+            worker_logger.warning("Link channel is broken")
 
     def processing(self, payload):
         # This function should implement in subclass.

@@ -1,8 +1,8 @@
 # =============================================================================
 # Author: falseuser
-# File Name: slave_utils.py
+# File Name: worker_utils.py
 # Created Time: 2018-09-07 17:41:41
-# Last modified: 2018-09-08 16:32:05
+# Last modified: 2018-09-12 11:22:38
 # Description:
 # =============================================================================
 import logging
@@ -13,11 +13,11 @@ from configparser import SafeConfigParser
 
 class ConfigHandler(SafeConfigParser):
 
-    DEFAULT = {
+    DEFAULTS = {
     }
 
     def __init__(self, filename):
-        super().__init__(self.DEFAULT)
+        super().__init__(self.DEFAULTS)
         self.read(filename)
 
 
@@ -48,5 +48,5 @@ class LogHandler(logging.Logger):
             os.mkdir(self._logpath)
 
 
-slave_logger = LogHandler("slave")
+worker_logger = LogHandler("worker")
 link_logger = LogHandler("link")
