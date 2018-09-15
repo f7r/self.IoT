@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: link.py
 # Created Time: 2018-08-29 16:38:37
-# Last modified: 2018-09-12 11:21:13
+# Last modified: 2018-09-15 18:14:28
 # Description:
 # =============================================================================
 import paho.mqtt.client as mqtt
@@ -41,12 +41,12 @@ class WorkerLink(object):
 
     def on_connect(self, client, userdata, flags, rc):
         self.client.subscribe(
-            topic=self.get_topic,
+            topic=self.cmd_topic,
             qos=2,
         )
         self.status_id = rc
         if self.status_id == 0:
-            worker_logger.info("Connection success.")
+            worker_logger.info("Connection succeeded.")
 
     def on_message(self, client, userdata, msg):
         self.processing(msg.payload)
@@ -56,17 +56,16 @@ class WorkerLink(object):
 
     def send(self, payload):
         cmd_info = self.client.publish(
-            topic=self.put_topic,
+            topic=self.data_topic,
             payload=payload,
             qos=2,
         )
         self.last_mid = cmd_info.mid
-        if cmd_info.rc != 0:
-            self.status_id = cmd_info.rc
-            worker_logger.warning("Link channel is broken")
+        self.status_id = cmd_info.rc
+        return cmd_info.rc
 
     def processing(self, payload):
-        # This function should implement in subclass.
+        # This function should implement in subclass or use Monkey Patch.
         raise NotImplementedError
 
     def start(self):
