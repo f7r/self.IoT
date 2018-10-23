@@ -10,6 +10,6 @@ Worker: 被控制的设备<br/>
 
 # topic 设计 #
 
-1. 用于获取 Worker 数据的 topic：<parent topic>/<worker id>/get<br/>
-2. 用于发送指令的 topic：<parent topic>/<worker id>/put<br/>
+1. 用于获取 Worker 数据的 topic：\<parent topic\>/\<worker id\>/get<br/>
+2. 用于发送指令的 topic：\<parent topic\>/\<worker id\>/put<br/>
 
