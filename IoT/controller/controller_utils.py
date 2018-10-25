@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: controller_utils.py
 # Created Time: 2018-09-07 17:41:41
-# Last modified: 2018-10-25 16:22:29
+# Last modified: 2018-10-25 16:58:34
 # Description:
 # =============================================================================
 import logging
@@ -15,7 +15,12 @@ from configparser import SafeConfigParser
 # General data.
 
 BASE_COMMANDS = [
-    "get_time",
+    "get_system_time",
+    "get_supported_commands",
+    "get_cpu_usage",
+    "get_memory_usage",
+    "get_disk_usage",
+    "get_os_platform",
 ]
 
 
