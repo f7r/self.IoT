@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: controller_utils.py
 # Created Time: 2018-09-07 17:41:41
-# Last modified: 2018-10-24 16:53:39
+# Last modified: 2018-10-25 16:22:29
 # Description:
 # =============================================================================
 import logging
@@ -11,6 +11,15 @@ import subprocess
 from logging.handlers import RotatingFileHandler
 from configparser import SafeConfigParser
 
+
+# General data.
+
+BASE_COMMANDS = [
+    "get_time",
+]
+
+
+# Classes.
 
 class ConfigHandler(SafeConfigParser):
 
@@ -53,7 +62,17 @@ controller_logger = LogHandler("controller")
 link_logger = LogHandler("link")
 
 
+# Functions.
+
 def run_shell_cmd(shell_cmd):
     p = subprocess.Popen(shell_cmd, shell=True, stdout=subprocess.PIPE)
     output = p.stdout.read()
     return output
+
+
+# Exceptions.
+
+class DatabaseOperationError(Exception):
+
+    def __str__(self):
+        return "Database Operation Error."
