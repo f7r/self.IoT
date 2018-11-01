@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: database.py
 # Created Time: 2018-10-24 16:58:58
-# Last modified: 2018-10-25 16:22:09
+# Last modified: 2018-10-26 11:13:10
 # Description:
 # =============================================================================
 import datetime
@@ -25,6 +25,8 @@ DB_NAME = config.get('database', 'db_name')
 if DB_TYPE == "sqlite":
     DB_FILE = config.get('sqlite', 'db_file')
     engine = create_engine("sqlite:///{0}".format(DB_FILE))
+else:
+    controller_logger.error("Unsupported Database {0}".format(DB_TYPE))
 
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -75,14 +77,14 @@ class DBOperation(object):
             unregistered="N",
         )
         self.session.add(worker)
-        self.commit()
-        # add log
+        msg = "worker {0} has been registered.".format(worker_id)
+        self.commit(msg)
 
     def del_worker(self, worker_id):
         worker = self.session.query(Worker).get(worker_id)
         self.session.delete(worker)
-        self.commit()
-        # add log
+        msg = "Worker {0} has been Deleted.".format(worker_id)
+        self.commit(msg)
 
     def get_worker(self, worker_id):
         worker = self.session.query(Worker).get(worker_id)
@@ -91,29 +93,48 @@ class DBOperation(object):
     def set_worker_description(self, worker_id, description):
         worker = self.session.query(Worker).get(worker_id)
         worker.description = description
-        self.commit()
+        msg = "Worker {0} description updated.".format(worker_id)
+        self.commit(msg)
 
     def set_worker_last_response_time(self, worker_id, last_response_time):
         worker = self.session.query(Worker).get(worker_id)
         worker.last_response_time = last_response_time
-        self.commit()
+        msg = "Worker {0} last response time updated.".format(worker_id)
+        self.commit(msg)
 
     def set_worker_online(self, worker_id, online):
         worker = self.session.query(Worker).get(worker_id)
         worker.online = online
-        self.commit()
+        msg = "Worker {0} online status updated.".format(worker_id)
+        self.commit(msg)
 
     def set_worker_unregistered(self, worker_id, unregistered):
         worker = self.session.query(Worker).get(worker_id)
         worker.unregistered = unregistered
-        self.commit()
+        msg = "Worker {0} has been unregistered".format(worker_id)
+        self.commit(msg)
+
+    def get_workers_count(self):
+        count = self.session.query(Worker.worker_id).count()
+        return count
+
+    def get_online_workers_count(self):
+        workers = self.session.query(Worker)
+        count = workers.filter(Worker.online == "Y").count()
+        return count
+
+    def get_registered_workers_count(self):
+        workers = self.session.query(Worker)
+        count = workers.filter(Worker.unregistered == "N").count()
+        return count
 
     def add_global_config(self):
         global_config = self.session.query(Config).get("global_config")
         if not global_config:
             global_config = Config(name="global_config", content="{}")
             self.session.add(global_config)
-            self.commit()
+            msg = "Initialization global config succeeded."
+            self.commit(msg)
 
     def get_global_config_content(self):
         global_config = self.session.query(Config).get("global_config")
@@ -122,7 +143,8 @@ class DBOperation(object):
     def set_global_config_content(self, content):
         global_config = self.session.query(Config).get("global_config")
         global_config.content = content
-        self.commit()
+        msg = "Global config content updated."
+        self.commit(msg)
 
     def add_worker_config(self, worker_id):
         config_name = "{0}_config".format(worker_id)
@@ -130,7 +152,8 @@ class DBOperation(object):
         if not worker_config:
             worker_config = Config(name=config_name, content="{}")
             self.session.add(worker_config)
-            self.commit()
+            msg = "Add worker config {0} succeeded.".format(worker_id)
+            self.commit(msg)
 
     def get_worker_config_content(self, worker_id):
         config_name = "{0}_config".format(worker_id)
@@ -141,11 +164,13 @@ class DBOperation(object):
         config_name = "{0}_config".format(worker_id)
         worker_config = self.session.query(Config).get(config_name)
         worker_config.content = content
-        self.commit()
+        msg = "Worker config {0} updated.".format(worker_id)
+        self.commit(msg)
 
-    def commit(self):
+    def commit(self, msg):
         try:
             self.session.commit()
+            controller_logger.info(msg)
         except Exception as e:
             self.session.rollback()
             controller_logger.error("Database operation failed.")
@@ -168,4 +193,5 @@ if __name__ == "__main__":
         print(worker)
         print(worker.supported_commands)
         print(worker.last_response_time)
+    print(dbop.get_registered_workers_count())
     dbop.close()
