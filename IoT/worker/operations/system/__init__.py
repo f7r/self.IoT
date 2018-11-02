@@ -2,12 +2,15 @@
 # Author: falseuser
 # File Name: __init__.py
 # Created Time: 2018-10-25 17:05:25
-# Last modified: 2018-10-25 17:32:49
+# Last modified: 2018-11-02 22:53:55
 # Description:
 # =============================================================================
 import psutil
 import platform
 import datetime
+import socket
+import struct
+import fcntl
 import json
 
 
@@ -40,5 +43,16 @@ def get_os_platform():
 
 def get_system_time():
     fmt = "%Y-%m-%d %H:%M:%S"
-    system_time = datetime.datetime.now().strftime(fmt)
-    return system_time
+    return datetime.datetime.now().strftime(fmt)
+
+
+def get_ip():
+    ifname = "eth0"
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(
+        fcntl.ioctl(
+            s.fileno(),
+            0x8915,
+            struct.pack('256s', bytes(ifname[:15], 'utf-8')),
+        )[20:24]
+    )
