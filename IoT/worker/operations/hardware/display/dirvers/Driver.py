@@ -8,9 +8,9 @@ import RPi.GPIO as GPIO
 
 
 # Hardware setting
-OLED_RST_PIN = 25
-OLED_DC_PIN = 24
-OLED_CS_PIN = 8
+OLED_RST_PIN = 12
+OLED_DC_PIN = 5
+OLED_CS_PIN = 6
 
 COM_PROTO = 1  # Communication protocol, SPI: 1, I2C: 2
 

@@ -6,7 +6,7 @@ import time
 import RPi.GPIO as GPIO
 
 
-PIR_PIN = 23
+PIR_PIN = 25
 
 
 class GPIOperation(object):
