@@ -131,7 +131,7 @@ class Params(dict):
     __delattr__ = dict.__delitem__
 
 
-class Readings(object):
+class Reading(object):
 
     def __init__(self, pressure, temperature, humidity):
         self.pressure = pressure
@@ -145,7 +145,7 @@ class SensorDriver(object):
         self.io = GPIOperation()
         self.comp_params = self.io.load_calibration_params()
 
-    def _get_uncompensated_readings(self, block_data):
+    def _get_uncompensated_reading(self, block_data):
         uncompensated_pressure = (
             block_data[0] << 16 | block_data[1] << 8 | block_data[2]
         ) >> 4
@@ -153,34 +153,34 @@ class SensorDriver(object):
             block_data[3] << 16 | block_data[4] << 8 | block_data[5]
         ) >> 4
         uncompensated_humidity = block_data[6] << 8 | block_data[7]
-        uncompensated_readings = Readings(
+        uncompensated_reading = Reading(
             uncompensated_pressure,
             uncompensated_temperature,
             uncompensated_humidity,
         )
-        return uncompensated_readings
+        return uncompensated_reading
 
     """
     Compensation formulas translated,from Appendix A (8.1) of BME280 datasheet
     """
-    def _get_compensated_readings(self, uncompensated_readings):
+    def _get_compensated_reading(self, uncompensated_reading):
         compensated_pressure = self.__calc_pressure(
-            uncompensated_readings.pressure,
-            uncompensated_readings.temperature,
+            uncompensated_reading.pressure,
+            uncompensated_reading.temperature,
         ) / 100.0
         compensated_temperature = self.__tfine(
-            uncompensated_readings.temperature,
+            uncompensated_reading.temperature,
         ) / 5120.0
         compensated_humidity = self.__calc_humidity(
-            uncompensated_readings.humidity,
-            uncompensated_readings.temperature,
+            uncompensated_reading.humidity,
+            uncompensated_reading.temperature,
         )
-        compensated_readings = Readings(
+        compensated_reading = Reading(
             compensated_pressure,
             compensated_temperature,
             compensated_humidity,
         )
-        return compensated_readings
+        return compensated_reading
 
     def __tfine(self, t):
         v1 = t / 16384.0
@@ -246,6 +246,6 @@ class SensorDriver(object):
         time.sleep(delay)
 
         block_data = self.io.get_block_data(0xF7, 8)
-        uncomp_readings = self._get_uncompensated_readings(block_data)
-        comp_readings = self._get_compensated_readings(uncomp_readings)
-        return comp_readings
+        uncomp_reading = self._get_uncompensated_reading(block_data)
+        comp_reading = self._get_compensated_reading(uncomp_reading)
+        return comp_reading

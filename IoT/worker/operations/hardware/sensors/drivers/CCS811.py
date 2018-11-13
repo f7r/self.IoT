@@ -3,9 +3,7 @@
 Raspberry Pi CCS811 Driver.
 """
 import time
-#import Adafruit_PureIO.smbus as smbus
-import smbus2 as smbus
-#import smbus
+import smbus
 import RPi.GPIO as GPIO
 
 SENSOR_ADDR = 0x5B
@@ -63,8 +61,20 @@ class GPIOperation(object):
             return self.I2C.read_i2c_block_data(
                 self.I2C_ADDR, register, length)
 
+    def wake(self):
+        pass
+
+    def hard_reset(self):
+        pass
+
     def cleanup(self):
         GPIO.cleanup()
+
+
+class Reading(object):
+    def __init__(self, eco2, tvoc):
+        self.eco2 = eco2
+        self.tvoc = tvoc
 
 
 class SensorDriver(object):
@@ -106,18 +116,9 @@ class SensorDriver(object):
         eCO2 = (data[0] << 8) | (data[1])
         TVOC = (data[2] << 8) | (data[3])
         error_id = data[5]
-        if error_id == 0:
-            return eCO2, TVOC
+        if error_id == 0 and \
+                400 <= eCO2 < 32768 and \
+                0 <= TVOC <= 32768:
+            return Reading(eCO2, TVOC)
         else:
-            return 1000000000, error_id
-
-if __name__ == "__main__":
-    driver = SensorDriver()
-    for i in range(10):
-        time.sleep(2)
-        eCO2, TVOC = driver.sample()
-        if 400 <= eCO2 < 32768 and 0 <= TVOC <= 32768:
-            print(eCO2, TVOC)
-        else:
-            print("invalid value")
-    driver.reset()
+            raise ValueError("Invalid Reading")
