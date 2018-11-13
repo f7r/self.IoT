@@ -47,6 +47,12 @@ class GPIOperation(object):
         else:
             return self.I2C.read_byte_data(self.I2C_ADDR, register)
 
+    def sleep(self):
+        GPIO.output(OE_PIN, GPIO.HIGH)
+
+    def wake(self):
+        GPIO.output(OE_PIN, GPIO.LOW)
+
     def cleanup(self):
         GPIO.cleanup(OE_PIN)
 
@@ -98,3 +104,9 @@ class CHIPDriver(object):
         "Sets the Servo Pulse,The PWM frequency must be 50HZ"
         pulse = pulse * 4096 / 20000  # 50HZ,the period is 20000us
         self.setPWM(channel, 0, int(pulse))
+
+    def sleep(self):
+        self.io.sleep()
+
+    def wake(self):
+        self.io.wake()
