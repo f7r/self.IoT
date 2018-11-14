@@ -17,12 +17,13 @@ class DustSensor(object):
         self.io = serial.Serial(SERIAL_DEVICE, 9600)
 
     def get_raw_data(self):
-        count = self.io.inWaiting()
-        if count == 32:
-            raw_data = self.io.read(count)
-        self.io.flushInput()
-        time.sleep(0.1)
-        return raw_data
+        for i in range(30):
+            count = self.io.inWaiting()
+            if count == 32:
+                raw_data = self.io.read(count)
+                return raw_data
+            self.io.flushInput()
+            time.sleep(0.1)
 
     def get_list_data(self, raw_data):
         try:
@@ -44,6 +45,7 @@ class DustSensor(object):
             data[1] == 0x4D,
             data[2] == 0x00,
             data[3] == 0x1C,
+            sum(data[:30]) == data[30] << 8 | data[31],
         ]
         return all(conditions)
 
