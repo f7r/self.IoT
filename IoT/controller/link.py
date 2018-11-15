@@ -2,15 +2,15 @@
 # Author: falseuser
 # File Name: link.py
 # Created Time: 2018-08-29 16:38:37
-# Last modified: 2018-11-15 17:28:34
+# Last modified: 2018-11-15 17:30:41
 # Description:
 # =============================================================================
 import paho.mqtt.client as mqtt
 # from configure import CONFIG
-from worker_utils import link_logger, worker_logger, config
+from controller_utils import link_logger, controller_logger, config
 
 
-class WorkerLink(object):
+class ControllerLink(object):
 
     def __init__(self, client_id, parent_topic):
         self.client_id = client_id
@@ -40,14 +40,14 @@ class WorkerLink(object):
         )
 
     def on_connect(self, client, userdata, flags, rc):
-        """Subscribe to command topic"""
+        """Subscribe to data topic."""
         self.client.subscribe(
-            topic=self.cmd_topic,
+            topic=self.data_topic,
             qos=2,
         )
         self.status_id = rc
         if self.status_id == 0:
-            worker_logger.info("Connection succeeded.")
+            controller_logger.info("Connection succeeded.")
 
     def on_message(self, client, userdata, msg):
         self.processing(msg.payload)
@@ -56,15 +56,15 @@ class WorkerLink(object):
         pass
 
     def send(self, payload):
-        """Send data payload to data topic."""
-        data_info = self.client.publish(
-            topic=self.data_topic,
+        """Send command payload to command topic."""
+        cmd_info = self.client.publish(
+            topic=self.cmd_topic,
             payload=payload,
             qos=2,
         )
-        self.last_mid = data_info.mid
-        self.status_id = data_info.rc
-        return data_info.rc
+        self.last_mid = cmd_info.mid
+        self.status_id = cmd_info.rc
+        return cmd_info.rc
 
     def processing(self, payload):
         # This function should implement in subclass or use Monkey Patch.
