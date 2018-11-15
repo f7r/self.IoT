@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: oled.py
 # Created Time: 2018-11-02 16:30:00
-# Last modified: 2018-11-02 22:55:14
+# Last modified: 2018-11-15 11:26:42
 # Description:
 # =============================================================================
 import time
@@ -10,7 +10,7 @@ import datetime
 import threading
 from PIL import Image, ImageDraw, ImageFont
 from IoT.worker.operations import system
-from .drivers import Driver
+from drivers import Driver
 
 
 class Display(object):

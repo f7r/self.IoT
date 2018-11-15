@@ -1,7 +1,7 @@
 # =============================================================================
 # Author: falseuser
 # Created Time: 2018-11-13 16:31:06
-# Last modified: 2018-11-14 16:51:59
+# Last modified: 2018-11-15 11:29:52
 # Description: LGSJS1B.py
 # =============================================================================
 import time
@@ -24,6 +24,7 @@ class DustSensor(object):
                 return raw_data
             self.io.flushInput()
             time.sleep(0.1)
+        raise TimeoutError("Can not get DustSensor data.")
 
     def get_list_data(self, raw_data):
         try:
