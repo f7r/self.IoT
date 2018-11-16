@@ -2,14 +2,19 @@
 # Author: falseuser
 # File Name: commands.py
 # Created Time: 2018-09-15 17:21:12
-# Last modified: 2018-11-15 12:12:03
+# Last modified: 2018-11-16 17:28:46
 # Description:
 # =============================================================================
 from operations import system
 from operations.hardware import sensors, head
 
 
+def get_all_data():
+    pass
+
+
 CMD_FUNC_MAP = {
+    "get_all_data": get_all_data,
     "get_system_time": system.get_system_time,
     "get_cpu_usage": system.get_cpu_usage,
     "get_memory_usage": system.get_memory_usage,

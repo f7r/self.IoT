@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: database.py
 # Created Time: 2018-10-24 16:58:58
-# Last modified: 2018-10-26 11:13:10
+# Last modified: 2018-11-16 17:06:46
 # Description:
 # =============================================================================
 import datetime
@@ -10,7 +10,7 @@ import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, CHAR, DATETIME, TEXT, VARCHAR
+from sqlalchemy import Integer, Column, CHAR, DATETIME, TEXT, VARCHAR
 from controller_utils import (
     config,
     BASE_COMMANDS,
@@ -38,9 +38,6 @@ class Config(Base):
     name = Column(VARCHAR(20), primary_key=True)
     content = Column(TEXT, nullable=False)  # josn string.
 
-    def __repr__(self):
-        return "<Table: Config> {0}".format(self.name)
-
 
 class Worker(Base):
 
@@ -52,8 +49,13 @@ class Worker(Base):
     online = Column(CHAR(1), nullable=False)  # Y or N
     unregistered = Column(CHAR(1), nullable=False)  # Y or N
 
-    def __repr__(self):
-        return "<Table: Worker> {0}".format(self.worker_id)
+
+class WorkerData(Base):
+    __tablename__ = "WorkerData"
+    id = Column(Integer, primary_key=True)
+    worker_id = Column(VARCHAR(20), nullable=False)
+    time = Column(DATETIME, nullable=False)
+    data = Column(TEXT, nullable=False)
 
 
 # Create Tables if not exist.
@@ -165,6 +167,13 @@ class DBOperation(object):
         worker_config = self.session.query(Config).get(config_name)
         worker_config.content = content
         msg = "Worker config {0} updated.".format(worker_id)
+        self.commit(msg)
+
+    def save_worker_data(self, worker_id, data):
+        now = datetime.datetime.now()
+        worker_data = WorkerData(worker_id=worker_id, time=now, data=data)
+        self.session.add(worker_data)
+        msg = "Add worker data {0} succeeded.".format(worker_id)
         self.commit(msg)
 
     def commit(self, msg):

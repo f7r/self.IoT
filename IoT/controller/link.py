@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: link.py
 # Created Time: 2018-08-29 16:38:37
-# Last modified: 2018-11-15 17:30:41
+# Last modified: 2018-11-16 16:07:08
 # Description:
 # =============================================================================
 import paho.mqtt.client as mqtt
@@ -14,8 +14,6 @@ class ControllerLink(object):
 
     def __init__(self, client_id, parent_topic):
         self.client_id = client_id
-        self.data_topic = "{0}/{1}/data".format(parent_topic, client_id)
-        self.cmd_topic = "{0}/{1}/cmd".format(parent_topic, client_id)
         self.status_id = 255
         self.status_msg = ""
         self.userdata = ""
@@ -39,26 +37,30 @@ class ControllerLink(object):
             keepalive=config.getint("mqtt", "keepalive"),
         )
 
+    def add_worker(self, worker_id):
+        worker_data_topic = "{0}/{1}/data".format(self.parent_topic, worker_id)
+        self.client.subscribe(topic=worker_data_topic, qos=2)
+
+    def remove_worker(self, worker_id):
+        worker_data_topic = "{0}/{1}/data".format(self.parent_topic, worker_id)
+        self.client.unsubscribe(worker_data_topic)
+
     def on_connect(self, client, userdata, flags, rc):
-        """Subscribe to data topic."""
-        self.client.subscribe(
-            topic=self.data_topic,
-            qos=2,
-        )
         self.status_id = rc
         if self.status_id == 0:
             controller_logger.info("Connection succeeded.")
 
     def on_message(self, client, userdata, msg):
-        self.processing(msg.payload)
+        self.processing(msg.topic, msg.payload)
 
     def on_publish(self, client, userdata, mid):
         pass
 
-    def send(self, payload):
+    def send(self, worker_id, payload):
         """Send command payload to command topic."""
+        worker_cmd_topic = "{0}/{1}/cmd".format(self.parent_topic, worker_id)
         cmd_info = self.client.publish(
-            topic=self.cmd_topic,
+            topic=worker_cmd_topic,
             payload=payload,
             qos=2,
         )
@@ -66,7 +68,7 @@ class ControllerLink(object):
         self.status_id = cmd_info.rc
         return cmd_info.rc
 
-    def processing(self, payload):
+    def processing(self, topic, payload):
         # This function should implement in subclass or use Monkey Patch.
         raise NotImplementedError
 
