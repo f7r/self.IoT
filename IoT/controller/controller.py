@@ -1,7 +1,7 @@
 # =============================================================================
 # Author: falseuser
 # Created Time: 2018-11-15 17:11:34
-# Last modified: 2018-11-17 16:26:43
+# Last modified: 2018-11-17 18:16:32
 # Description: controller.py
 # =============================================================================
 import time
@@ -21,6 +21,7 @@ class Controller(object):
         self.worker_manager = WorkerManager()
         self.rpc_server = SimpleXMLRPCServer(("localhost", 8088))
         self.rpc_server.register_instance(ControllerRPCHandler())
+        self.db = DBOperation()
 
     def run(self):
         self.worker_manager.run()
@@ -42,8 +43,13 @@ class ControllerRPCHandler(object):
     def set_worker_config(self, worker_id, config):
         self.db.set_worker_config_content(worker_id, config)
 
-    def get_data(self):
-        pass
+    def get_temperature_last(self, worker_id):
+        cmd = "get_temperature"
+        return self.db.get_worker_data(worker_id, cmd, "last")
+
+    def get_temperature_24h(self, worker_id):
+        cmd = "get_temperature"
+        return self.db.get_worker_data(worker_id, cmd, "24h")
 
 
 class WorkerManager(object):

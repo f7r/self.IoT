@@ -2,12 +2,12 @@
 # Author: falseuser
 # File Name: database.py
 # Created Time: 2018-10-24 16:58:58
-# Last modified: 2018-11-17 15:06:25
+# Last modified: 2018-11-17 18:02:38
 # Description:
 # =============================================================================
 import datetime
 import json
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, and_
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Integer, Column, CHAR, DATETIME, TEXT, VARCHAR
@@ -173,6 +173,25 @@ class DBOperation(object):
         worker_config.content = content
         msg = "Worker config {0} updated.".format(worker_id)
         self.commit(msg)
+
+    def get_worker_data(self, worker_id, cmd, time_limit):
+        now = datetime.datetime.now()
+        if time_limit == "last":
+            data = self.session.query(WorkerData).filter(
+                and_(WorkerData.worker_id == worker_id, WorkerData.cmd == cmd)
+            ).order_by(WorkerData.time).last()
+        elif time_limit == "24h":
+            start_time = now - 24
+            data = self.session.query(WorkerData).filter(
+                and_(
+                    WorkerData.worker_id == worker_id,
+                    WorkerData.cmd == cmd,
+                    WorkerData.time >= start_time,
+                )
+            ).order_by(WorkerData.time).all()
+        elif time_limit == "7d":
+            pass
+        return data
 
     def save_worker_data(self, worker_id, cmd, data):
         """Save worker returned data
