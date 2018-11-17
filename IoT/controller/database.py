@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: database.py
 # Created Time: 2018-10-24 16:58:58
-# Last modified: 2018-11-16 17:06:46
+# Last modified: 2018-11-17 15:06:25
 # Description:
 # =============================================================================
 import datetime
@@ -55,6 +55,7 @@ class WorkerData(Base):
     id = Column(Integer, primary_key=True)
     worker_id = Column(VARCHAR(20), nullable=False)
     time = Column(DATETIME, nullable=False)
+    cmd = Column(VARCHAR(50), nullable=False)
     data = Column(TEXT, nullable=False)
 
 
@@ -82,7 +83,7 @@ class DBOperation(object):
         msg = "worker {0} has been registered.".format(worker_id)
         self.commit(msg)
 
-    def del_worker(self, worker_id):
+    def remove_worker(self, worker_id):
         worker = self.session.query(Worker).get(worker_id)
         self.session.delete(worker)
         msg = "Worker {0} has been Deleted.".format(worker_id)
@@ -119,6 +120,10 @@ class DBOperation(object):
     def get_workers_count(self):
         count = self.session.query(Worker.worker_id).count()
         return count
+
+    def get_online_workers_id(self):
+        workers = self.session.query(Worker).filter(Worker.online == "Y")
+        return [worker.worker_id for worker in workers]
 
     def get_online_workers_count(self):
         workers = self.session.query(Worker)
@@ -169,9 +174,20 @@ class DBOperation(object):
         msg = "Worker config {0} updated.".format(worker_id)
         self.commit(msg)
 
-    def save_worker_data(self, worker_id, data):
+    def save_worker_data(self, worker_id, cmd, data):
+        """Save worker returned data
+        data type:
+            worker_id: string
+            cmd: string
+            data: string
+        """
         now = datetime.datetime.now()
-        worker_data = WorkerData(worker_id=worker_id, time=now, data=data)
+        worker_data = WorkerData(
+            worker_id=worker_id,
+            time=now,
+            cmd=cmd,
+            data=data,
+        )
         self.session.add(worker_data)
         msg = "Add worker data {0} succeeded.".format(worker_id)
         self.commit(msg)
