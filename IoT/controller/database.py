@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: database.py
 # Created Time: 2018-10-24 16:58:58
-# Last modified: 2018-11-17 18:02:38
+# Last modified: 2018-11-20 17:01:00
 # Description:
 # =============================================================================
 import datetime
@@ -129,6 +129,10 @@ class DBOperation(object):
         workers = self.session.query(Worker)
         count = workers.filter(Worker.online == "Y").count()
         return count
+
+    def get_registered_workers_id(self):
+        workers = self.session.query(Worker).filter(Worker.unregistered == "N")
+        return [worker.worker_id for worker in workers]
 
     def get_registered_workers_count(self):
         workers = self.session.query(Worker)

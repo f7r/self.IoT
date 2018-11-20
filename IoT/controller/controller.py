@@ -1,7 +1,7 @@
 # =============================================================================
 # Author: falseuser
 # Created Time: 2018-11-15 17:11:34
-# Last modified: 2018-11-17 18:16:32
+# Last modified: 2018-11-20 17:37:52
 # Description: controller.py
 # =============================================================================
 import time
@@ -18,13 +18,15 @@ from database import DBOperation
 class Controller(object):
 
     def __init__(self):
-        self.worker_manager = WorkerManager()
+        self.worker_mgr = WorkerManager()
+        self.task_mgr = WorkerTaskManager(self.worker_mgr.exec_command)
         self.rpc_server = SimpleXMLRPCServer(("localhost", 8088))
         self.rpc_server.register_instance(ControllerRPCHandler())
         self.db = DBOperation()
 
     def run(self):
-        self.worker_manager.run()
+        self.worker_mgr.run()
+        self.task_mgr.run()
         self.rpc_server.serve_forever()
 
 
@@ -50,6 +52,56 @@ class ControllerRPCHandler(object):
     def get_temperature_24h(self, worker_id):
         cmd = "get_temperature"
         return self.db.get_worker_data(worker_id, cmd, "24h")
+
+
+class WorkerTaskManager(object):
+
+    def __init__(self, exec_func):
+        self.db = DBOperation()
+        self.exec_func = exec_func
+        self.removed_workers = set()
+
+    def periodic_cmd(self, worker_id, cmd, period):
+        """exection command periodic."""
+        while True:
+            time.sleep(period)
+            self.exec_func(worker_id, cmd)
+            if worker_id in self.removed_workers:
+                break
+
+    def run_worker_task(self, worker_id, config):
+        """
+        config_dict: {
+            "periodic": {
+                "command1": 30,
+                "command2": 40,
+            }
+        }
+        """
+        config_dict = json.load(config)
+        periodic_task = config_dict["periodic"]
+        for cmd in periodic_task:
+            period = periodic_task[cmd]
+            t = threading.Thread(
+                target=self.periodic_cmd,
+                args=(worker_id, cmd, period),
+            )
+            t.start()
+
+    def run(self):
+        """run workers periodic task"""
+        workers_id = self.db.get_registered_workers_id()
+        for worker_id in workers_id:
+            self.start_worker_task(worker_id)
+
+    def start_worker_task(self, worker_id):
+        if worker_id in self.removed_workers:
+            self.removed_workers.remove(worker_id)
+        worker_config = self.db.get_worker_config_content(worker_id)
+        self.run_worker_task(worker_id, worker_config)
+
+    def stop_worker_task(self, worker_id):
+        self.removed_workers.add(worker_id)
 
 
 class WorkerManager(object):
@@ -79,6 +131,7 @@ class WorkerManager(object):
 
     def add_worker(self, worker_id, description=""):
         self.db.add_worker(worker_id, description)
+        self.db.add_worker_config(worker_id)
         self.link.add_worker(worker_id)
 
     def remove_worker(self, worker_id):
@@ -133,41 +186,8 @@ class WorkerManager(object):
     def handle_emergency(self, cid, worker_id, data):
         pass
 
-    def periodic_cmd(self, worker_id, cmd, period):
-        """exection command periodic."""
-        while True:
-            time.sleep(period)
-            self.exec_command(worker_id, cmd)
-
-    def run_worker_periodic_task(self, worker_id, config):
-        """
-        config_dict: {
-            "periodic": {
-                "command1": 30,
-                "command2": 40,
-            }
-        }
-        """
-        config_dict = json.load(config)
-        periodic_task = config_dict["periodic"]
-        for cmd in periodic_task:
-            period = periodic_task[cmd]
-            t = threading.Thread(
-                target=self.periodic_cmd,
-                args=(worker_id, cmd, period),
-            )
-            t.start()
-
-    def worker_tasks(self):
-        """run workers periodic task"""
-        workers_id = self.db.get_online_workers()
-        for worker_id in workers_id:
-            worker_config = self.db.get_worker_config_content(worker_id)
-            self.run_worker_periodic_task(worker_id, worker_config)
-
     def run(self):
         self.link.start()
-        self.worker_tasks()
 
 
 class WatingCommand(collections.UserDict):
@@ -187,3 +207,8 @@ class WatingCommand(collections.UserDict):
         self.data[key] = item
         timer = threading.Thread(target=self._delete_timer, args=(key,))
         timer.start()
+
+
+if __name__ == "__main__":
+    controller = Controller()
+    controller.run()

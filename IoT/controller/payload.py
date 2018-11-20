@@ -2,11 +2,10 @@
 # Author: falseuser
 # File Name: payload.py
 # Created Time: 2018-08-30 15:14:42
-# Last modified: 2018-09-15 18:04:04
+# Last modified: 2018-11-20 17:12:55
 # Description:
 # =============================================================================
 import json
-from commands import CMD_FUNC_MAP
 
 
 class CommandPayload(object):
@@ -15,8 +14,6 @@ class CommandPayload(object):
     """
 
     def __init__(self, command, args, cid):
-        if command not in CMD_FUNC_MAP:
-            raise ValueError("Unsupported command.")
         self.command = command
         self.args = args
         self.cid = cid
