@@ -1,7 +1,7 @@
 # =============================================================================
 # Author: falseuser
 # Created Time: 2018-11-15 17:11:34
-# Last modified: 2018-11-21 17:18:47
+# Last modified: 2018-11-21 18:26:38
 # Description: controller.py
 # =============================================================================
 import time
@@ -79,6 +79,9 @@ class ControllerRPCHandler(object):
 
     def get_worker_data(self, worker_id, cmd):
         return self.controller.get_worker_data(worker_id, cmd, "last")
+
+    def get_worker_data1(self, worker_id, cmd):
+        return self.controller.get_worker_data(worker_id, cmd, "24h")
 
     def set_worker_config(self, worker_id, config):
         self.controller.set_worker_config(worker_id, config)
@@ -222,11 +225,11 @@ class WorkerManager(object):
             controller_logger.warning(
                 "Command(cid={0}) send failed.".format(cmd_payload.cid))
 
-    def exec_command(self, worker_id, cmd, args=None, cid=0):
+    def exec_command(self, worker_id, cmd, cid=0):
         """cmd: string command."""
         if not cid:
             cid = self.cid
-        cmd_payload = CommandPayload(cmd, args, cid)
+        cmd_payload = CommandPayload(cmd, cid)
         self.send_cmd(worker_id, cmd_payload)
         self._send[worker_id] += 1
         self.wating_cmd[cid] = (worker_id, cmd)

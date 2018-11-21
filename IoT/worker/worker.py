@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: worker.py
 # Created Time: 2018-09-07 18:00:22
-# Last modified: 2018-11-21 17:05:40
+# Last modified: 2018-11-21 17:48:50
 # Description:
 # =============================================================================
 import time
@@ -31,10 +31,9 @@ class Worker(object):
             worker_logger.exception(e)
             return
         cmd = cmd_payload.command
-        args = cmd_payload.args
         cid = cmd_payload.cid
         func = CMD_FUNC_MAP[cmd]
-        data = func(args)
+        data = func()
         data_payload = DataPayload(data, cid)
         self.send_data(data_payload)
 
