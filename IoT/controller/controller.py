@@ -1,7 +1,7 @@
 # =============================================================================
 # Author: falseuser
 # Created Time: 2018-11-15 17:11:34
-# Last modified: 2018-11-20 17:37:52
+# Last modified: 2018-11-21 17:18:47
 # Description: controller.py
 # =============================================================================
 import time
@@ -18,40 +18,79 @@ from database import DBOperation
 class Controller(object):
 
     def __init__(self):
+        self.db = DBOperation()
         self.worker_mgr = WorkerManager()
         self.task_mgr = WorkerTaskManager(self.worker_mgr.exec_command)
         self.rpc_server = SimpleXMLRPCServer(("localhost", 8088))
-        self.rpc_server.register_instance(ControllerRPCHandler())
-        self.db = DBOperation()
+        self.rpc_server.register_instance(ControllerRPCHandler(self))
 
-    def run(self):
-        self.worker_mgr.run()
-        self.task_mgr.run()
-        self.rpc_server.serve_forever()
-
-
-class ControllerRPCHandler(object):
-
-    def __init__(self):
-        self.worker_manager = WorkerManager()
-        self.db = DBOperation()
-
-    def add_worker(self, worker_id, description=""):
-        self.worker_manager.add_worker(worker_id, description)
+    def add_worker(self, worker_id, description):
+        self.db.add_worker(worker_id, description)
+        self.db.add_worker_config(worker_id)
+        self.worker_mgr.link_worker(worker_id)
 
     def remove_worker(self, worker_id):
-        self.worker_manager.remove_worker(worker_id)
+        self.db.remove_worker(worker_id)
+        self.worker_mgr.unlink_worker(worker_id)
 
     def set_worker_config(self, worker_id, config):
         self.db.set_worker_config_content(worker_id, config)
 
+    def get_worker_data(self, worker_id, cmd, time_limit):
+        return self.db.get_worker_data(worker_id, cmd, time_limit)
+
+    def _link_workers(self):
+        workers_id_list = self.db.get_registered_workers_id_list()
+        for worker_id in workers_id_list:
+            self.worker_mgr.link_worker(worker_id)
+
+    def run(self):
+        self.worker_mgr.run()
+        self._link_workers()
+        self.task_mgr.run()
+        controller_logger.info("Controller Started.")
+        self.rpc_server.serve_forever()  # The process is blocked here.
+
+
+class ControllerRPCHandler(object):
+
+    def __init__(self, controller):
+        self.controller = controller
+        self.worker_mgr = self.controller.worker_mgr
+        self.db = self.controller.db
+
+    def add_worker(self, worker_id, description=""):
+        self.controller.add_worker(worker_id, description)
+        return 0
+
+    def remove_worker(self, worker_id):
+        self.controller.remove_worker(worker_id)
+        return 0
+
+    def get_workers_id_list(self):
+        return self.db.get_registered_workers_id_list()
+
+    def get_workers_count(self):
+        return self.db.get_registered_workers_count()
+
+    def send_cmd(self, worker_id, cmd):
+        self.worker_mgr.exec_command(worker_id, cmd)
+        return 0
+
+    def get_worker_data(self, worker_id, cmd):
+        return self.controller.get_worker_data(worker_id, cmd, "last")
+
+    def set_worker_config(self, worker_id, config):
+        self.controller.set_worker_config(worker_id, config)
+        return 0
+
     def get_temperature_last(self, worker_id):
         cmd = "get_temperature"
-        return self.db.get_worker_data(worker_id, cmd, "last")
+        return self.controller.get_worker_data(worker_id, cmd, "last")
 
     def get_temperature_24h(self, worker_id):
         cmd = "get_temperature"
-        return self.db.get_worker_data(worker_id, cmd, "24h")
+        return self.controller.get_worker_data(worker_id, cmd, "24h")
 
 
 class WorkerTaskManager(object):
@@ -78,20 +117,21 @@ class WorkerTaskManager(object):
             }
         }
         """
-        config_dict = json.load(config)
-        periodic_task = config_dict["periodic"]
-        for cmd in periodic_task:
-            period = periodic_task[cmd]
-            t = threading.Thread(
-                target=self.periodic_cmd,
-                args=(worker_id, cmd, period),
-            )
-            t.start()
+        config_dict = json.loads(config)
+        if "periodic" in config_dict:
+            periodic_task = config_dict["periodic"]
+            for cmd in periodic_task:
+                period = periodic_task[cmd]
+                t = threading.Thread(
+                    target=self.periodic_cmd,
+                    args=(worker_id, cmd, period),
+                )
+                t.start()
 
     def run(self):
         """run workers periodic task"""
-        workers_id = self.db.get_registered_workers_id()
-        for worker_id in workers_id:
+        workers_id_list = self.db.get_registered_workers_id_list()
+        for worker_id in workers_id_list:
             self.start_worker_task(worker_id)
 
     def start_worker_task(self, worker_id):
@@ -108,14 +148,16 @@ class WorkerManager(object):
     """Manage and connection with workers."""
 
     def __init__(self):
-        controller_id = config.get("default", "controller_id")
-        parent_topic = config.get("mqtt", "parent_topic")
-        self.link = ControllerLink(controller_id, parent_topic)
+        self.controller_id = config.get("default", "controller_id")
+        self.parent_topic = config.get("mqtt", "parent_topic")
+        self.link = ControllerLink(self.controller_id, self.parent_topic)
         self.link.processing = self.processing
         self.cid = 0
         self.db = DBOperation()
-        self.wating_cmd = WatingCommand(time_out=10)
+        self.wating_cmd = WatingCommand(time_out=20)
         self.emergency_cids = {-1, -2, -3}
+        self._send = {}
+        self._received = {}
 
     def _get_worker_id(self, topic):
         topic_list = topic.split(self.parent_topic)
@@ -129,14 +171,15 @@ class WorkerManager(object):
         else:
             raise ValueError("Can not get worker id")
 
-    def add_worker(self, worker_id, description=""):
-        self.db.add_worker(worker_id, description)
-        self.db.add_worker_config(worker_id)
+    def link_worker(self, worker_id):
         self.link.add_worker(worker_id)
+        self._send[worker_id] = 0
+        self._received[worker_id] = 0
 
-    def remove_worker(self, worker_id):
-        self.db.remove_worker(worker_id)
+    def unlink_worker(self, worker_id):
         self.link.remove_worker(worker_id)
+        del self._send[worker_id]
+        self._received[worker_id]
 
     def processing(self, topic, payload):
         """payload: string"""
@@ -148,11 +191,13 @@ class WorkerManager(object):
         worker_id = self._get_worker_id(topic)
         data = data_payload.data
         cid = data_payload.cid
-        if cid in self.self.wating_cmd:
-            if self.self.wating_cmd[cid][0] == worker_id:
-                cmd = self.self.wating_cmd[cid][1]
+        if cid in self.wating_cmd:
+            if self.wating_cmd[cid][0] == worker_id:
+                self._received[worker_id] += 1
+                cmd = self.wating_cmd[cid][1]
                 self.db.save_worker_data(worker_id, cmd, data)
-                controller_logger.info("Get data from {0}.".format(worker_id))
+                self.db.set_worker_online(worker_id, "Y")
+                self.db.set_worker_response_now(worker_id)
             else:
                 controller_logger.error("Worker id mismatch.")
         elif cid in self.emergency_cids:
@@ -162,6 +207,9 @@ class WorkerManager(object):
         else:
             controller_logger.error(
                 "Time out or unrecognized data.")
+
+        if self._send[worker_id] - self._received[worker_id] >= 3:
+            self.db.set_worker_online(worker_id, "N")
 
     def send_cmd(self, worker_id, cmd_payload):
         """cmd_payload: CommandPayload instance."""
@@ -174,12 +222,13 @@ class WorkerManager(object):
             controller_logger.warning(
                 "Command(cid={0}) send failed.".format(cmd_payload.cid))
 
-    def exec_command(self, worker_id, cmd, cid=0, args=None):
+    def exec_command(self, worker_id, cmd, args=None, cid=0):
         """cmd: string command."""
         if not cid:
             cid = self.cid
         cmd_payload = CommandPayload(cmd, args, cid)
         self.send_cmd(worker_id, cmd_payload)
+        self._send[worker_id] += 1
         self.wating_cmd[cid] = (worker_id, cmd)
         self.cid = cid + 1
 
@@ -193,7 +242,7 @@ class WorkerManager(object):
 class WatingCommand(collections.UserDict):
     """There is a time limit for data"""
 
-    def __init__(self, *args, time_out=5, **kwargs):
+    def __init__(self, *args, time_out=15, **kwargs):
         collections.UserDict.__init__(self, *args, **kwargs)
         self.time_out = time_out
 

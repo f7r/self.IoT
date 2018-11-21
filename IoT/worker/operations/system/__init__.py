@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: __init__.py
 # Created Time: 2018-10-25 17:05:25
-# Last modified: 2018-11-02 22:53:55
+# Last modified: 2018-11-21 17:42:04
 # Description:
 # =============================================================================
 import psutil
@@ -26,7 +26,7 @@ def get_disk_usage():
     return psutil.disk_usage("/").percent
 
 
-def get_os_platform():
+def get_os_platform(args):
     kernel_version = platform.release()
     python_version = platform.python_version()
     distribution = platform.linux_distribution()

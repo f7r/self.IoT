@@ -2,12 +2,12 @@
 # Author: falseuser
 # File Name: database.py
 # Created Time: 2018-10-24 16:58:58
-# Last modified: 2018-11-20 17:01:00
+# Last modified: 2018-11-21 17:30:00
 # Description:
 # =============================================================================
 import datetime
 import json
-from sqlalchemy import create_engine, and_
+from sqlalchemy import create_engine, and_, exc
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Integer, Column, CHAR, DATETIME, TEXT, VARCHAR
@@ -99,6 +99,10 @@ class DBOperation(object):
         msg = "Worker {0} description updated.".format(worker_id)
         self.commit(msg)
 
+    def set_worker_response_now(self, worker_id):
+        now = datetime.datetime.now()
+        self.set_worker_last_response_time(worker_id, now)
+
     def set_worker_last_response_time(self, worker_id, last_response_time):
         worker = self.session.query(Worker).get(worker_id)
         worker.last_response_time = last_response_time
@@ -121,7 +125,7 @@ class DBOperation(object):
         count = self.session.query(Worker.worker_id).count()
         return count
 
-    def get_online_workers_id(self):
+    def get_online_workers_id_list(self):
         workers = self.session.query(Worker).filter(Worker.online == "Y")
         return [worker.worker_id for worker in workers]
 
@@ -130,7 +134,7 @@ class DBOperation(object):
         count = workers.filter(Worker.online == "Y").count()
         return count
 
-    def get_registered_workers_id(self):
+    def get_registered_workers_id_list(self):
         workers = self.session.query(Worker).filter(Worker.unregistered == "N")
         return [worker.worker_id for worker in workers]
 
@@ -181,12 +185,12 @@ class DBOperation(object):
     def get_worker_data(self, worker_id, cmd, time_limit):
         now = datetime.datetime.now()
         if time_limit == "last":
-            data = self.session.query(WorkerData).filter(
+            data = self.session.query(WorkerData.data).filter(
                 and_(WorkerData.worker_id == worker_id, WorkerData.cmd == cmd)
-            ).order_by(WorkerData.time).last()
+            ).order_by(WorkerData.time).first()
         elif time_limit == "24h":
             start_time = now - 24
-            data = self.session.query(WorkerData).filter(
+            data = self.session.query(WorkerData.data).filter(
                 and_(
                     WorkerData.worker_id == worker_id,
                     WorkerData.cmd == cmd,
@@ -195,7 +199,7 @@ class DBOperation(object):
             ).order_by(WorkerData.time).all()
         elif time_limit == "7d":
             pass
-        return data
+        return data[0]
 
     def save_worker_data(self, worker_id, cmd, data):
         """Save worker returned data
@@ -219,11 +223,15 @@ class DBOperation(object):
         try:
             self.session.commit()
             controller_logger.info(msg)
-        except Exception as e:
+        except exc.IntegrityError as e:
             self.session.rollback()
             controller_logger.error("Database operation failed.")
             controller_logger.exception(e)
             raise DatabaseOperationError
+        except Exception as e:
+            self.session.rollback()
+            controller_logger.exception(e)
+            raise Exception
 
     def close(self):
         self.session.close()

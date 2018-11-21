@@ -2,12 +2,12 @@
 # Author: falseuser
 # File Name: worker.py
 # Created Time: 2018-09-07 18:00:22
-# Last modified: 2018-09-15 18:14:54
+# Last modified: 2018-11-21 17:05:40
 # Description:
 # =============================================================================
 import time
 from link import WorkerLink
-from commands import CMD_FUNC_MAP
+from commands2 import CMD_FUNC_MAP
 from worker_utils import config, worker_logger
 from payload import CommandPayload, DataPayload
 

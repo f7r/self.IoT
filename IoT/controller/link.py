@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: link.py
 # Created Time: 2018-08-29 16:38:37
-# Last modified: 2018-11-16 16:07:08
+# Last modified: 2018-11-21 15:48:46
 # Description:
 # =============================================================================
 import paho.mqtt.client as mqtt
@@ -14,6 +14,7 @@ class ControllerLink(object):
 
     def __init__(self, client_id, parent_topic):
         self.client_id = client_id
+        self.parent_topic = parent_topic
         self.status_id = 255
         self.status_msg = ""
         self.userdata = ""
