@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: database.py
 # Created Time: 2018-10-24 16:58:58
-# Last modified: 2018-11-21 18:26:56
+# Last modified: 2018-11-22 18:15:39
 # Description:
 # =============================================================================
 import datetime
@@ -24,7 +24,10 @@ DB_NAME = config.get('database', 'db_name')
 
 if DB_TYPE == "sqlite":
     DB_FILE = config.get('sqlite', 'db_file')
-    engine = create_engine("sqlite:///{0}".format(DB_FILE))
+    engine = create_engine(
+        "sqlite:///{0}".format(DB_FILE),
+        connect_args={'check_same_thread':False},
+    )
 else:
     controller_logger.error("Unsupported Database {0}".format(DB_TYPE))
 
@@ -183,14 +186,14 @@ class DBOperation(object):
         self.commit(msg)
 
     def get_worker_data(self, worker_id, cmd, time_limit):
+        # return data is dict
         now = datetime.datetime.now()
         if time_limit == "last":
             data_item = self.session.query(WorkerData).filter(
                 and_(WorkerData.worker_id == worker_id, WorkerData.cmd == cmd)
             ).order_by(WorkerData.time.desc()).first()
-            return data_item.data
+            return {str(data_item.time): data_item.data}
         elif time_limit == "24h":
-            # return data is list
             start_time = now - datetime.timedelta(hours=24)
             data_items = self.session.query(WorkerData).filter(
                 and_(
@@ -199,9 +202,11 @@ class DBOperation(object):
                     WorkerData.time >= start_time,
                 )
             ).order_by(WorkerData.time).all()
-            return [data_item.data for data_item in data_items]
+            return {
+                str(data_item.time): data_item.data
+                for data_item in data_items
+            }
         elif time_limit == "7d":
-            # return data is list
             start_time = now - datetime.timedelta(weeks=1)
             data_items = self.session.query(WorkerData).filter(
                 and_(
@@ -210,7 +215,10 @@ class DBOperation(object):
                     WorkerData.time >= start_time,
                 )
             ).order_by(WorkerData.time).all()
-            return [data_item.data for data_item in data_items]
+            return {
+                str(data_item.time): data_item.data
+                for data_item in data_items
+            }
 
     def save_worker_data(self, worker_id, cmd, data):
         """Save worker returned data

@@ -1,7 +1,7 @@
 # =============================================================================
 # Author: falseuser
 # Created Time: 2018-11-15 17:11:34
-# Last modified: 2018-11-21 18:26:38
+# Last modified: 2018-11-22 18:07:11
 # Description: controller.py
 # =============================================================================
 import time
@@ -13,6 +13,10 @@ from link import ControllerLink
 from controller_utils import config, controller_logger
 from payload import CommandPayload, DataPayload
 from database import DBOperation
+
+
+ONLINE = "Y"
+OFFLINE = "N"
 
 
 class Controller(object):
@@ -35,6 +39,7 @@ class Controller(object):
 
     def set_worker_config(self, worker_id, config):
         self.db.set_worker_config_content(worker_id, config)
+        self.task_mgr.set_worker_config_post(worker_id)
 
     def get_worker_data(self, worker_id, cmd, time_limit):
         return self.db.get_worker_data(worker_id, cmd, time_limit)
@@ -105,10 +110,16 @@ class WorkerTaskManager(object):
 
     def periodic_cmd(self, worker_id, cmd, period):
         """exection command periodic."""
+        def short_sleep(seconds):
+            for i in range(seconds):
+                time.sleep(1)
+                if worker_id in self.removed_workers:
+                    return
         while True:
-            time.sleep(period)
             self.exec_func(worker_id, cmd)
+            short_sleep(period)
             if worker_id in self.removed_workers:
+                print("End thread")
                 break
 
     def run_worker_task(self, worker_id, config):
@@ -137,6 +148,16 @@ class WorkerTaskManager(object):
         for worker_id in workers_id_list:
             self.start_worker_task(worker_id)
 
+    def _restart_worker_task(self, worker_id):
+        self.stop_worker_task(worker_id)
+        time.sleep(2)
+        self.start_worker_task(worker_id)
+
+    def set_worker_config_post(self, worker_id):
+        t = threading.Thread(
+            target=self._restart_worker_task, args=(worker_id,))
+        t.start()
+
     def start_worker_task(self, worker_id):
         if worker_id in self.removed_workers:
             self.removed_workers.remove(worker_id)
@@ -159,8 +180,18 @@ class WorkerManager(object):
         self.db = DBOperation()
         self.wating_cmd = WatingCommand(time_out=20)
         self.emergency_cids = {-1, -2, -3}
-        self._send = {}
-        self._received = {}
+        self._send_map = {}  # workers send cmd count.
+        self._received_map = {}  # workers received cmd count.
+        self._state_map = {}  # workers state cache.
+
+    def _set_worker_state(self, worker_id, state):
+        current_state = self._state_map[worker_id]
+        if state != current_state:
+            self._state_map[worker_id] = state
+            self.db.set_worker_online(worker_id, state)
+
+    def _get_worker_state(self, worker_id):
+        return self._state_map[worker_id]
 
     def _get_worker_id(self, topic):
         topic_list = topic.split(self.parent_topic)
@@ -176,13 +207,13 @@ class WorkerManager(object):
 
     def link_worker(self, worker_id):
         self.link.add_worker(worker_id)
-        self._send[worker_id] = 0
-        self._received[worker_id] = 0
+        self._send_map[worker_id] = 0
+        self._received_map[worker_id] = 0
 
     def unlink_worker(self, worker_id):
         self.link.remove_worker(worker_id)
-        del self._send[worker_id]
-        self._received[worker_id]
+        del self._send_map[worker_id]
+        self._received_map[worker_id]
 
     def processing(self, topic, payload):
         """payload: string"""
@@ -196,10 +227,10 @@ class WorkerManager(object):
         cid = data_payload.cid
         if cid in self.wating_cmd:
             if self.wating_cmd[cid][0] == worker_id:
-                self._received[worker_id] += 1
+                self._received_map[worker_id] += 1
                 cmd = self.wating_cmd[cid][1]
                 self.db.save_worker_data(worker_id, cmd, data)
-                self.db.set_worker_online(worker_id, "Y")
+                self._set_worker_state(worker_id, ONLINE)
                 self.db.set_worker_response_now(worker_id)
             else:
                 controller_logger.error("Worker id mismatch.")
@@ -211,8 +242,10 @@ class WorkerManager(object):
             controller_logger.error(
                 "Time out or unrecognized data.")
 
-        if self._send[worker_id] - self._received[worker_id] >= 3:
-            self.db.set_worker_online(worker_id, "N")
+        if self._send_map[worker_id] - self._received[worker_id] >= 3:
+            self._set_worker_state(worker_id, OFFLINE)
+            controller_logger.warning(
+                "Mark worker {0} offline.".format(worker_id))
 
     def send_cmd(self, worker_id, cmd_payload):
         """cmd_payload: CommandPayload instance."""
@@ -226,12 +259,17 @@ class WorkerManager(object):
                 "Command(cid={0}) send failed.".format(cmd_payload.cid))
 
     def exec_command(self, worker_id, cmd, cid=0):
+        print("Fake exec_command called")
+        return
         """cmd: string command."""
         if not cid:
             cid = self.cid
+        if self._get_worker_state(worker_id) != ONLINE:
+            msg = "Worker {0} state is offline, maybe can not response."
+            controller_logger.warning(msg.format(worker_id))
         cmd_payload = CommandPayload(cmd, cid)
         self.send_cmd(worker_id, cmd_payload)
-        self._send[worker_id] += 1
+        self._send_map[worker_id] += 1
         self.wating_cmd[cid] = (worker_id, cmd)
         self.cid = cid + 1
 
