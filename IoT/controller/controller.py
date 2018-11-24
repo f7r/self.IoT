@@ -1,7 +1,7 @@
 # =============================================================================
 # Author: falseuser
 # Created Time: 2018-11-15 17:11:34
-# Last modified: 2018-11-22 18:07:11
+# Last modified: 2018-11-24 18:10:40
 # Description: controller.py
 # =============================================================================
 import time
@@ -180,8 +180,6 @@ class WorkerManager(object):
         self.db = DBOperation()
         self.wating_cmd = WatingCommand(time_out=20)
         self.emergency_cids = {-1, -2, -3}
-        self._send_map = {}  # workers send cmd count.
-        self._received_map = {}  # workers received cmd count.
         self._state_map = {}  # workers state cache.
 
     def _set_worker_state(self, worker_id, state):
@@ -207,13 +205,9 @@ class WorkerManager(object):
 
     def link_worker(self, worker_id):
         self.link.add_worker(worker_id)
-        self._send_map[worker_id] = 0
-        self._received_map[worker_id] = 0
 
     def unlink_worker(self, worker_id):
         self.link.remove_worker(worker_id)
-        del self._send_map[worker_id]
-        self._received_map[worker_id]
 
     def processing(self, topic, payload):
         """payload: string"""
@@ -226,11 +220,11 @@ class WorkerManager(object):
         data = data_payload.data
         cid = data_payload.cid
         if cid in self.wating_cmd:
-            if self.wating_cmd[cid][0] == worker_id:
-                self._received_map[worker_id] += 1
-                cmd = self.wating_cmd[cid][1]
-                self.db.save_worker_data(worker_id, cmd, data)
+            taking_worker_id, taking_cmd = self.wating_cmd.take_item(cid)
+            if worker_id == taking_worker_id:
+                self.db.save_worker_data(worker_id, taking_cmd, data)
                 self._set_worker_state(worker_id, ONLINE)
+                self.wating_cmd.reset_timeout_count(worker_id)
                 self.db.set_worker_response_now(worker_id)
             else:
                 controller_logger.error("Worker id mismatch.")
@@ -242,7 +236,8 @@ class WorkerManager(object):
             controller_logger.error(
                 "Time out or unrecognized data.")
 
-        if self._send_map[worker_id] - self._received[worker_id] >= 3:
+        if self.wating_cmd.get_timeout_count(worker_id) > 3:
+            # 3 consecutive commands to return timeouts.
             self._set_worker_state(worker_id, OFFLINE)
             controller_logger.warning(
                 "Mark worker {0} offline.".format(worker_id))
@@ -269,7 +264,6 @@ class WorkerManager(object):
             controller_logger.warning(msg.format(worker_id))
         cmd_payload = CommandPayload(cmd, cid)
         self.send_cmd(worker_id, cmd_payload)
-        self._send_map[worker_id] += 1
         self.wating_cmd[cid] = (worker_id, cmd)
         self.cid = cid + 1
 
@@ -286,12 +280,31 @@ class WatingCommand(collections.UserDict):
     def __init__(self, *args, time_out=15, **kwargs):
         collections.UserDict.__init__(self, *args, **kwargs)
         self.time_out = time_out
+        self.timeout_count_map = collections.defaultdict(int)
 
-    def _delete_timer(self, key):
+    def get_timeout_count(self, worker_id):
+        return self.timeout_count_map.get(worker_id)
+
+    def take_item(self, cid):
+        # get item only once.
+        item = self.data[cid]
+        del self.data[cid]
+        return item
+
+    def reset_timeout_count(self, worker_id):
+        self.timeout_count_map[worker_id] = 0
+
+    def _delete_timer(self, cid):
         """Timeout will be deleted"""
         time.sleep(self.time_out)
-        if key in self.data:
-            del self.data[key]
+        if cid in self.data:
+            try:
+                worker_id = self.data[cid][0]
+                self.timeout_count_map[worker_id] += 1
+            except KeyError:
+                pass
+            finally:  # XXX Maybe KeyError
+                del self.data[cid]
 
     def __setitem__(self, key, item):
         self.data[key] = item
