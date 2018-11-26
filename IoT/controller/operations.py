@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: operations.py
 # Created Time: 2018-10-24 15:09:58
-# Last modified: 2018-11-26 16:38:35
+# Last modified: 2018-11-26 18:10:00
 # Description:
 # =============================================================================
 import xmlrpc.client
@@ -33,21 +33,6 @@ class ControllerOperations(object):
     def get_online_workers_id_list(self):
         return rpc_proxy.get_online_workers_id_list()
 
-    def get_worker_config(self, worker_id):
-        return rpc_proxy.get_worker_config(worker_id)
-
-    def set_worker_config(self, worker_id, config):
-        # config: dict
-        v = rpc_proxy.set_worker_config(worker_id, config)
-        if v == 0:
-            return OK
-
-    def get_worker_supported_commands(self, worker_id):
-        return rpc_proxy.get_worker_supported_commands(worker_id)
-
-    def get_worker_description(self, worker_id):
-        return rpc_proxy.get_worker_description(worker_id)
-
     def register_worker(self, worker_id, description=""):
         v = rpc_proxy.add_worker(worker_id)
         if v == 0:
@@ -63,8 +48,8 @@ class WorkerOperations(object):
     """ Mainly by run command operation.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, worker_id):
+        self.worker_id = worker_id
 
     def run_command(self, command):
         pass
@@ -72,14 +57,26 @@ class WorkerOperations(object):
     def get_system_info(self):
         pass
 
+    def get_config(self):
+        return rpc_proxy.get_worker_config(self.worker_id)
+
+    def get_description(self):
+        return rpc_proxy.get_worker_description(self.worker_id)
+
     def get_supported_commands(self):
-        pass
+        return rpc_proxy.get_supported_commands(self.worker_id)
+
+    def set_config(self, config):
+        # config: dict
+        v = rpc_proxy.set_worker_config(self.worker_id, config)
+        if v == 0:
+            return OK
 
     def reboot(self):
-        pass
+        self.run_command("reboot")
 
     def shutdown(self):
-        pass
+        self.run_command("shutdown")
 
 
 class AdminOperations(object):
