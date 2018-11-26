@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: database.py
 # Created Time: 2018-10-24 16:58:58
-# Last modified: 2018-11-22 18:15:39
+# Last modified: 2018-11-26 16:33:14
 # Description:
 # =============================================================================
 import datetime
@@ -102,6 +102,14 @@ class DBOperation(object):
         msg = "Worker {0} description updated.".format(worker_id)
         self.commit(msg)
 
+    def get_worker_description(self, worker_id):
+        worker = self.session.query(Worker).get(worker_id)
+        return worker.description
+
+    def get_worker_supported_commands(self, worker_id):
+        worker = self.session.query(Worker).get(worker_id)
+        return worker.supported_commands
+
     def set_worker_response_now(self, worker_id):
         now = datetime.datetime.now()
         self.set_worker_last_response_time(worker_id, now)
@@ -117,6 +125,10 @@ class DBOperation(object):
         worker.online = online
         msg = "Worker {0} online status updated.".format(worker_id)
         self.commit(msg)
+
+    def get_worker_online(self, worker_id):
+        worker = self.session.query(Worker).get(worker_id)
+        return worker.online
 
     def set_worker_unregistered(self, worker_id, unregistered):
         worker = self.session.query(Worker).get(worker_id)

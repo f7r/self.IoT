@@ -1,7 +1,7 @@
 # =============================================================================
 # Author: falseuser
 # Created Time: 2018-11-15 17:11:34
-# Last modified: 2018-11-24 18:10:40
+# Last modified: 2018-11-26 16:39:54
 # Description: controller.py
 # =============================================================================
 import time
@@ -17,6 +17,7 @@ from database import DBOperation
 
 ONLINE = "Y"
 OFFLINE = "N"
+UNREGISTERED = "Y"
 
 
 class Controller(object):
@@ -28,30 +29,8 @@ class Controller(object):
         self.rpc_server = SimpleXMLRPCServer(("localhost", 8088))
         self.rpc_server.register_instance(ControllerRPCHandler(self))
 
-    def add_worker(self, worker_id, description):
-        self.db.add_worker(worker_id, description)
-        self.db.add_worker_config(worker_id)
-        self.worker_mgr.link_worker(worker_id)
-
-    def remove_worker(self, worker_id):
-        self.db.remove_worker(worker_id)
-        self.worker_mgr.unlink_worker(worker_id)
-
-    def set_worker_config(self, worker_id, config):
-        self.db.set_worker_config_content(worker_id, config)
-        self.task_mgr.set_worker_config_post(worker_id)
-
-    def get_worker_data(self, worker_id, cmd, time_limit):
-        return self.db.get_worker_data(worker_id, cmd, time_limit)
-
-    def _link_workers(self):
-        workers_id_list = self.db.get_registered_workers_id_list()
-        for worker_id in workers_id_list:
-            self.worker_mgr.link_worker(worker_id)
-
     def run(self):
         self.worker_mgr.run()
-        self._link_workers()
         self.task_mgr.run()
         controller_logger.info("Controller Started.")
         self.rpc_server.serve_forever()  # The process is blocked here.
@@ -62,43 +41,56 @@ class ControllerRPCHandler(object):
     def __init__(self, controller):
         self.controller = controller
         self.worker_mgr = self.controller.worker_mgr
+        self.task_mgr = self.controller.task_mgr
         self.db = self.controller.db
 
     def add_worker(self, worker_id, description=""):
-        self.controller.add_worker(worker_id, description)
+        self.db.add_worker(worker_id, description)
+        self.db.add_worker_config(worker_id)
+        self.worker_mgr.link_worker(worker_id)
         return 0
 
     def remove_worker(self, worker_id):
-        self.controller.remove_worker(worker_id)
+        self.db.set_worker_unregistered(worker_id, UNREGISTERED)
+        self.worker_mgr.unlink_worker(worker_id)
+        return 0
+
+    def get_global_config(self):
+        return self.db.get_global_config_content()
+
+    def set_global_config(self, config):
+        self.db.set_global_config_content(config)
         return 0
 
     def get_workers_id_list(self):
         return self.db.get_registered_workers_id_list()
 
+    def get_online_workers_id_list(self):
+        return self.db.get_online_workers_id_list()
+
     def get_workers_count(self):
         return self.db.get_registered_workers_count()
+
+    def get_worker_description(self, worker_id):
+        return self.db.get_worker_description(worker_id)
+
+    def get_worker_supported_commands(self, worker_id):
+        return self.db.get_worker_supported_commands(worker_id)
 
     def send_cmd(self, worker_id, cmd):
         self.worker_mgr.exec_command(worker_id, cmd)
         return 0
 
-    def get_worker_data(self, worker_id, cmd):
-        return self.controller.get_worker_data(worker_id, cmd, "last")
-
-    def get_worker_data1(self, worker_id, cmd):
-        return self.controller.get_worker_data(worker_id, cmd, "24h")
+    def get_worker_data(self, worker_id, cmd, time_limit):
+        return self.db.get_worker_data(worker_id, cmd, time_limit)
 
     def set_worker_config(self, worker_id, config):
-        self.controller.set_worker_config(worker_id, config)
+        self.db.set_worker_config_content(worker_id, config)
+        self.task_mgr.post_worker_config_set(worker_id)
         return 0
 
-    def get_temperature_last(self, worker_id):
-        cmd = "get_temperature"
-        return self.controller.get_worker_data(worker_id, cmd, "last")
-
-    def get_temperature_24h(self, worker_id):
-        cmd = "get_temperature"
-        return self.controller.get_worker_data(worker_id, cmd, "24h")
+    def get_worker_config(self, worker_id):
+        return self.db.get_worker_config_content(worker_id)
 
 
 class WorkerTaskManager(object):
@@ -107,6 +99,15 @@ class WorkerTaskManager(object):
         self.db = DBOperation()
         self.exec_func = exec_func
         self.removed_workers = set()
+        self.running_workers = set()
+
+    def is_online(self, worker_id):
+        if self.db.get_worker_online(worker_id) == "Y":
+            return True
+        elif self.db.get_worker_online(worker_id) == "N":
+            return False
+        else:
+            raise ValueError
 
     def periodic_cmd(self, worker_id, cmd, period):
         """exection command periodic."""
@@ -117,12 +118,15 @@ class WorkerTaskManager(object):
                     return
         while True:
             self.exec_func(worker_id, cmd)
-            short_sleep(period)
+            if self.is_online(worker_id):
+                short_sleep(period)
+            else:
+                short_sleep(period*10)
             if worker_id in self.removed_workers:
                 print("End thread")
                 break
 
-    def run_worker_task(self, worker_id, config):
+    def run_worker_periodic_task(self, worker_id, config):
         """
         config_dict: {
             "periodic": {
@@ -153,7 +157,7 @@ class WorkerTaskManager(object):
         time.sleep(2)
         self.start_worker_task(worker_id)
 
-    def set_worker_config_post(self, worker_id):
+    def post_worker_config_set(self, worker_id):
         t = threading.Thread(
             target=self._restart_worker_task, args=(worker_id,))
         t.start()
@@ -161,10 +165,13 @@ class WorkerTaskManager(object):
     def start_worker_task(self, worker_id):
         if worker_id in self.removed_workers:
             self.removed_workers.remove(worker_id)
+            self.running_workers.add(worker_id)
         worker_config = self.db.get_worker_config_content(worker_id)
-        self.run_worker_task(worker_id, worker_config)
+        self.run_worker_periodic_task(worker_id, worker_config)
 
     def stop_worker_task(self, worker_id):
+        if worker_id in self.running_workers:
+            self.running_workers.remove(worker_id)
         self.removed_workers.add(worker_id)
 
 
@@ -208,6 +215,11 @@ class WorkerManager(object):
 
     def unlink_worker(self, worker_id):
         self.link.remove_worker(worker_id)
+
+    def _link_workers(self):
+        workers_id_list = self.db.get_registered_workers_id_list()
+        for worker_id in workers_id_list:
+            self.link_worker(worker_id)
 
     def processing(self, topic, payload):
         """payload: string"""
@@ -272,6 +284,7 @@ class WorkerManager(object):
 
     def run(self):
         self.link.start()
+        self._link_workers()
 
 
 class WatingCommand(collections.UserDict):
