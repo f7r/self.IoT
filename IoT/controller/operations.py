@@ -2,7 +2,7 @@
 # Author: falseuser
 # File Name: operations.py
 # Created Time: 2018-10-24 15:09:58
-# Last modified: 2018-11-26 18:10:00
+# Last modified: 2018-11-28 10:38:37
 # Description:
 # =============================================================================
 import xmlrpc.client
@@ -45,7 +45,7 @@ class ControllerOperations(object):
 
 
 class WorkerOperations(object):
-    """ Mainly by run command operation.
+    """ Operation target is specified worker.
     """
 
     def __init__(self, worker_id):
