@@ -4,7 +4,7 @@
 # Last modified: 2018-11-14 17:15:06
 # Description: lgsjs1b.py LGSJS1B Laser dust sensor.
 # =============================================================================
-from drivers import LGSJS1B
+from .drivers import LGSJS1B
 
 
 driver = LGSJS1B.DustSensor()

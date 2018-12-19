@@ -4,7 +4,7 @@
 # Last modified: 2018-11-13 16:20:32
 # Description: ccs811.py
 # =============================================================================
-from drivers import CCS811
+from .drivers import CCS811
 
 
 __all__ = ["get_eco2", "get_tvoc"]

@@ -5,7 +5,7 @@
 # Last modified: 2018-11-13 16:21:27
 # Description:
 # =============================================================================
-from drivers import PIR
+from .drivers import PIR
 
 
 __all__ = ["get_approaching"]

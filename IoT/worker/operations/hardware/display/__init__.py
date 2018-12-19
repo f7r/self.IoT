@@ -5,10 +5,11 @@
 # Last modified: 2018-12-19 12:07:04
 # Description:
 # =============================================================================
+import os
 import time
 import threading
 from PIL import Image, ImageDraw, ImageFont
-from drivers import Driver
+from .drivers import Driver
 
 
 class Display(object):
@@ -19,7 +20,8 @@ class Display(object):
         self.driver = Driver.OLEDDriver()
 
     def _load_font(self):
-        self.font_file = "consola_ascii.ttf"
+        _path = os.path.dirname(os.path.realpath(__file__))
+        self.font_file = "{0}/consola_ascii.ttf".format(_path)
         self.font_14 = ImageFont.truetype(self.font_file, size=14)
 
     def on(self):
@@ -33,14 +35,15 @@ class Display(object):
     def scroll_display(self, image):
         self.driver.clear()
         if image.height > 128:
-            for h in range(128, image.height, 8):
-                time.sleep(0.2)
-                box = (0, 0, 128, h)
+            for h in range(128, image.height):
+                # self.driver.clear()
+                box = (0, h - 128, 128, h)
                 dis_image = image.crop(box)
-                self.driver.clear()
                 self.driver.show_image(dis_image, 0, 0)
+                time.sleep(0.2)
         else:
             self.driver.show_image(image, 0, 0)
+        self.driver.clear()
 
     def get_image(self, lines):
         height = len(lines) * 16
@@ -53,7 +56,7 @@ class Display(object):
         draw.multiline_text(
             (0, 0),
             text=text_lines,
-            font=self.font14,
+            font=self.font_14,
             fill="White",
         )
         return image

@@ -6,7 +6,7 @@
 # Last modified: 2018-11-13 16:18:27
 # Description:
 # =============================================================================
-from drivers import BME280
+from .drivers import BME280
 
 
 __all__ = ["get_pressure", "get_temperature", "get_humidity"]
